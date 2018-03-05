@@ -78,9 +78,9 @@ uint64_t max_w = 0;         //max wait time
 uint64_t av_w;              //average wait time
 uint64_t curr_time;         //current time
 
-pthread_mutex_t q_mutex;    //mutex to control which process is active
-pthread_cond_t full;     //condition to prevent accessing full q
-pthread_cond_t empty;    //condition to prevent accessing empty q
+pthread_mutex_t q_mutex;    //mutex to control which process is in the q is active
+pthread_cond_t full;        //condition to prevent accessing full q
+pthread_cond_t empty;       //condition to prevent accessing empty q
 
 //function to retrun the nth fibonacci number iteratively
 void fn(int n){
@@ -95,7 +95,7 @@ void fn(int n){
     }
 }
 
-//producer to create products to put into the queue
+//producer to create products to put into the q
 void *producer(void* i){
     int a = *((int *)i); //producer id
     while (true){
