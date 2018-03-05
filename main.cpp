@@ -330,10 +330,6 @@ void *consumer_FCFS(void* i){
     pthread_exit(0);
 }
 
-double convertToSeconds(uint64_t microSeconds) {
-    return microSeconds / 1000000.;
-}
-
 double GetTimeInMinutes( timeval tvBegin, timeval tvEnd )
 {
 	long sec, usec;
