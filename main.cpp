@@ -334,12 +334,12 @@ double convertToSeconds(uint64_t microSeconds) {
     return microSeconds / 1000000.;
 }
 
-double GetTimeInSeconds ( timeval tvBegin, timeval tvEnd )
+double GetTimeInMinutes( timeval tvBegin, timeval tvEnd )
 {
 	long sec, usec;
 	sec = tvEnd.tv_sec - tvBegin.tv_sec;
 	usec = tvEnd.tv_usec - tvBegin.tv_usec;
-	return sec + 1e-6*usec;
+	return (sec + 1e-6*usec)*60;
 }
 
 int main(int argc, char *argv[]){
@@ -451,17 +451,17 @@ int main(int argc, char *argv[]){
     //calculate the processing time for all products
     e_time = e_time - s_time;
     //print out total processing time
-    cout<< "Total time for processing all products : "<< convertToSeconds(e_time) << "\n";
+    cout<< "Total time for processing all products : "<< (e_time) << "\n";
     av_t = av_t/product_num;
     av_w = av_w/product_num;
-    cout<< "Average turn-around time : "<< convertToSeconds(av_t) << "\n";
-    cout<< "Min turn-around time : "<< convertToSeconds(min_t) << "\n";
-    cout<< "Max turn-around time : "<< convertToSeconds(max_t) << "\n";
-    cout<< "Average wait time : "<< convertToSeconds(av_w) << "\n";
-    cout<< "Min wait time : "<< convertToSeconds(min_w) << "\n";
-    cout<< "Max wait time : "<< convertToSeconds(max_w) << "\n";
-    cout << "Producer throughput : " << (1 / (GetTimeInSeconds(producer_start, producer_end) / product_num)) * 60 << " products produced per minute" << endl;
-    cout << "Consumer throughput : " << (1 / (GetTimeInSeconds(consumer_start, consumer_end) / product_num)) * 60 << " products consumed per minute" << endl;
+    cout<< "Average turn-around time : "<< (av_t) << "\n";
+    cout<< "Min turn-around time : "<< (min_t) << "\n";
+    cout<< "Max turn-around time : "<< (max_t) << "\n";
+    cout<< "Average wait time : "<< (av_w) << "\n";
+    cout<< "Min wait time : "<< (min_w) << "\n";
+    cout<< "Max wait time : "<< (max_w) << "\n";
+    cout << "Producer throughput : " << (1 / (GetTimeInMinutes(producer_start, producer_end) / product_num)) << " products produced per minute" << endl;
+    cout << "Consumer throughput : " << (1 / (GetTimeInMinutes(consumer_start, consumer_end) / product_num)) << " products consumed per minute" << endl;
 
     delete q;
     return 0;
