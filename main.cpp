@@ -98,6 +98,9 @@ void fn(int n){
     }
 }
 
+timeval producer_start, producer_end;
+timeval consumer_start, consumer_end;
+
 //producer to create products to put into the q
 void *producer(void* i){
     //int a = *((int *)i); //producer id
@@ -113,6 +116,10 @@ void *producer(void* i){
             //contsruct the product
             gettimeofday(&tv, nullptr);
             uint64_t t = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec; //get the current timestamp
+
+            // if this is the first item being produced, get timeval of first producer
+            if (id == 0) { gettimeofday(&producer_start, NULL); }
+
             Product* p = new Product(id, seed, t, rand()%1024);
             id++;
             q->push(p);
@@ -124,6 +131,8 @@ void *producer(void* i){
         }
 
         if(id >= product_num){
+            // last product, producers finish, get timeval
+            gettimeofday(&producer_end, NULL);
             pthread_mutex_unlock(&q_mutex);
             pthread_cond_broadcast(&cond_empty); //broadcast to any consumers waiting to end
             break;
@@ -146,6 +155,10 @@ void *consumer_RR(void* i){
 
         if(consumed < product_num){
             Product* p = q->pop();
+
+            // if this is first product being consumed, start consumer throughput counter
+            if (p->product_id == 0) { gettimeofday(&consumer_start, NULL); }
+
             if(p != nullptr){ 
                 //handle the product if life longer than quantum
                 if(p->life >= quantum){
@@ -220,6 +233,10 @@ void *consumer_RR(void* i){
                     cout<< "Product "<< p->product_id<< " consumed by consumer \n";
 
                     consumed++;
+
+                    // check to see if all products have been consumed, if so end consumer throughput
+                    if (consumed == product_num) { gettimeofday(&consumer_end, NULL); }
+
                     delete p;
                 }
             }
@@ -253,6 +270,9 @@ void *consumer_FCFS(void* i){
 
         if(consumed++ < product_num){
             Product* p = q->pop();
+            // start consumer throughput if first item
+            if (p->product_id == 0) { gettimeofday(&consumer_start, NULL); }
+
             cout<< "Product "<< p->product_id<< " consumed by consumer "<< a<< "\n";
 
             //get current time to calculate wait time for product
@@ -293,6 +313,9 @@ void *consumer_FCFS(void* i){
                 min_t = curr_time - p->ts;
             }
 
+            // end consumer throughput if last product
+            if (consumed == product_num) { gettimeofday(&consumer_end, NULL); }
+
             delete p;
             pthread_cond_signal(&full);
             pthread_mutex_unlock(&q_mutex);
@@ -309,6 +332,14 @@ void *consumer_FCFS(void* i){
 
 double convertToSeconds(uint64_t microSeconds) {
     return microSeconds / 1000000.;
+}
+
+double GetTimeInSeconds ( timeval tvBegin, timeval tvEnd )
+{
+	long sec, usec;
+	sec = tvEnd.tv_sec - tvBegin.tv_sec;
+	usec = tvEnd.tv_usec - tvBegin.tv_usec;
+	return sec + 1e-6*usec;
 }
 
 int main(int argc, char *argv[]){
@@ -429,6 +460,8 @@ int main(int argc, char *argv[]){
     cout<< "Average wait time : "<< convertToSeconds(av_w) << "\n";
     cout<< "Min wait time : "<< convertToSeconds(min_w) << "\n";
     cout<< "Max wait time : "<< convertToSeconds(max_w) << "\n";
+    cout << "Producer throughput : " << (1 / (GetTimeInSeconds(producer_start, producer_end) / product_num)) * 60 << " products produced per minute" << endl;
+    cout << "Consumer throughput : " << (1 / (GetTimeInSeconds(consumer_start, consumer_end) / product_num)) * 60 << " products consumed per minute" << endl;
 
     delete q;
     return 0;
