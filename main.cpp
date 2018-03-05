@@ -72,10 +72,10 @@ Queue* q;
 timeval tv;                 //calculated the time values for performace analysis
 uint64_t min_t = INT_MAX;   //min turn around
 uint64_t max_t = 0;         //max turn around
-uint64_t av_t;              //average time
+uint64_t av_t = 0;          //average time, holds the total weight time and is divided by products in main
 uint64_t min_w = INT_MAX;   //min wait time
 uint64_t max_w = 0;         //max wait time
-uint64_t av_w;              //average wait time
+uint64_t av_w = 0;          //average wait time, holds the total weight time and is divided by products in main
 uint64_t curr_time;         //current time
 
 pthread_mutex_t q_mutex;    //mutex to control which process is in the q is active
@@ -143,24 +143,30 @@ void *consumer_RR(void* i){
 
         if(consumed < product_num){
             Product* p = q->pop();
-            if(p != nullptr){ //handle the product if life longer than quantum
+            if(p != nullptr){ 
+                //handle the product if life longer than quantum
                 if(p->life >= quantum){
                     p->life -= quantum;
                     //finds waiting times and changes values
                     gettimeofday(&tv, nullptr);
                     curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
                     av_w += curr_time - p->ts;
-                    if(curr_time - p->ts > max_w){
-                        max_w = curr_time - p->ts;
-                    }
-                    if(curr_time - p->ts < min_w){
-                        min_w = curr_time - p->ts;
-                    }
+
+                    // if(curr_time - p->ts > max_w){
+                    //     max_w = curr_time - p->ts;
+                    // }
+                    // if(curr_time - p->ts < min_w){
+                    //     min_w = curr_time - p->ts;
+                    // }
 
                     //insert into the product based on the quantum
                     for(int i = 0; i<quantum; i++){
                         fn(10);
                     }
+
+                    gettimeofday(&tv, nullptr);
+                    curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
+                    av_t += curr_time - p->ts;
 
                     //insert to back of q for further consumption
                     q->push(p);
@@ -234,7 +240,7 @@ void *consumer_FCFS(void* i){
             Product* p = q->pop();
             cout<< "Product "<< p->product_id<< " consumed by consumer "<< a<< "\n";
             //consume the product
-            //but the first is calculates the waiting time for the products and changes values as needed
+            //calculate the waiting time for the products
             gettimeofday(&tv, nullptr);
             curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec; //update the current time
             av_w += curr_time - p->ts;
