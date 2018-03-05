@@ -22,11 +22,13 @@ using namespace std;
 
 //Product to be added to the queue
 struct Product {
-    int product_id; //product id
-    clock_t ts;     //timestamp
-    int life;       //randomly generated "life" of product
+    int product_id;             //product id
+    clock_t ts;                 //timestamp for when product is produced
+    int life;                   //randomly generated "life" of product
+    clock_t end_ts;             //timestamp for when product is consumed
+    uint64_t consumption_time;  //tally of time being consumed, used to subtract from turn-around to get wait time
 
-    Product(int id, unsigned int seed, uint64_t t, int l) : product_id(id), ts(t), life(l) {}
+    Product(int id, unsigned int seed, uint64_t t, int l) : product_id(id), ts(t), life(l), consumption_time(0) {}
     ~Product(){}
 };
 
@@ -69,20 +71,21 @@ int seed;                   //seed for random numbers
 int product_num;            //number of products to be generated
 int quantum;                //quantum for round robin
 Queue* q;                   
+
 timeval tv;                 //calculated the time values for performace analysis
 uint64_t min_t = INT_MAX;   //min turn around
 uint64_t max_t = 0;         //max turn around
-uint64_t av_t = 0;          //average time, holds the total weight time and is divided by products in main
+uint64_t av_t = 0;          //average time, holds the total weight time and is divided by product_num in main()
 uint64_t min_w = INT_MAX;   //min wait time
 uint64_t max_w = 0;         //max wait time
-uint64_t av_w = 0;          //average wait time, holds the total weight time and is divided by products in main
+uint64_t av_w = 0;          //average wait time, holds the total weight time and is divided by product_num in main()
 uint64_t curr_time;         //current time
 
 pthread_mutex_t q_mutex;    //mutex to control which process is in the q is active
 pthread_cond_t full;        //condition to prevent accessing full q
 pthread_cond_t empty;       //condition to prevent accessing empty q
 
-//function to retrun the nth fibonacci number iteratively
+//function to return the nth fibonacci number iteratively
 void fn(int n){
     int a = 1;
     int b = 0;
@@ -97,7 +100,7 @@ void fn(int n){
 
 //producer to create products to put into the q
 void *producer(void* i){
-    int a = *((int *)i); //producer id
+    //int a = *((int *)i); //producer id
     while (true){
         pthread_mutex_lock(&q_mutex);
 
@@ -146,63 +149,75 @@ void *consumer_RR(void* i){
             if(p != nullptr){ 
                 //handle the product if life longer than quantum
                 if(p->life >= quantum){
-                    p->life -= quantum;
-                    //finds waiting times and changes values
-                    gettimeofday(&tv, nullptr);
-                    curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
-                    av_w += curr_time - p->ts;
+                    p->life -= quantum; 
 
-                    // if(curr_time - p->ts > max_w){
-                    //     max_w = curr_time - p->ts;
-                    // }
-                    // if(curr_time - p->ts < min_w){
-                    //     min_w = curr_time - p->ts;
-                    // }
+                    //get timestamp of start of consumption
+                    gettimeofday(&tv, nullptr);
+                    uint64_t start_cons = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
 
                     //insert into the product based on the quantum
                     for(int i = 0; i<quantum; i++){
                         fn(10);
                     }
 
+                    //get timestamp of end of this part of consumption
                     gettimeofday(&tv, nullptr);
-                    curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
-                    av_t += curr_time - p->ts;
+                    uint64_t end_cons = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
+                    
+                    //calculate time of this part of consumption and record in Product
+                    p->consumption_time += end_cons - start_cons;
 
                     //insert to back of q for further consumption
                     q->push(p);
                 }
                 else { //handle the entire product
-                    //update waiting time values and turn around time values for completed product
+                    //get start time of consumption
                     gettimeofday(&tv, nullptr);
-                    curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
-                    av_w += curr_time - p->ts;
-
-                    //update the wait times
-                    if(curr_time - p->ts > max_w){
-                        max_w = curr_time - p->ts;
-                    }
-
-                    if(curr_time - p->ts < min_w){
-                        min_w = curr_time - p->ts;
-                    }
+                    uint64_t start_cons = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
 
                     for (int i = 0; i<p->life; i++){
                         fn(10);
                     }
-                    cout<< "Product "<< p->product_id<< " consumed by consumer \n";
 
+                    //get end time of consumption
                     gettimeofday(&tv, nullptr);
-                    curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
-                    av_t += curr_time - p->ts;
+                    uint64_t end_cons = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
 
-                    //update turn around time as product is consumed
-                    if(curr_time - p->ts > max_t){
-                        max_t = curr_time - p->ts;
+                    //calculate time of this part of consumption and record in Product
+                    p->consumption_time += end_cons - start_cons;
+
+                    //update end_time of product to calculate turn around time
+                    p->end_ts = end_cons;
+
+                    //calculate turn around time for product
+                    uint64_t tat = p->end_ts - p->ts;
+
+                    //check for min/max turn around time
+                    if(tat > max_t){
+                        max_t = tat;
+                    }
+                    if(tat < min_t){
+                        min_t = tat;
                     }
 
-                    if(curr_time - p->ts < min_t){
-                        min_t = curr_time - p->ts;
+                    //add to tally of turn around time
+                    av_t += tat;
+
+                    //calculate wait time for product
+                    uint64_t wt = tat - p->consumption_time;
+
+                    //check for min/max wait time
+                    if(wt > max_w){
+                        max_w = wt;
                     }
+                    if(wt < min_w){
+                        min_w = wt;
+                    }
+
+                    //add to tally of wait time for product
+                    av_w += wt;
+
+                    cout<< "Product "<< p->product_id<< " consumed by consumer \n";
 
                     consumed++;
                     delete p;
@@ -239,13 +254,15 @@ void *consumer_FCFS(void* i){
         if(consumed++ < product_num){
             Product* p = q->pop();
             cout<< "Product "<< p->product_id<< " consumed by consumer "<< a<< "\n";
-            //consume the product
-            //calculate the waiting time for the products
+
+            //get current time to calculate wait time for product
             gettimeofday(&tv, nullptr);
             curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec; //update the current time
+            
+            //calculate wait time and add to running tally of wait time
             av_w += curr_time - p->ts;
 
-            //update wait times
+            //check for update in min/max wait times
             if(curr_time - p->ts > max_w){
                 max_w = curr_time - p->ts;
             }
@@ -260,11 +277,14 @@ void *consumer_FCFS(void* i){
                 }
             }
 
-            //update turn around time
+            //get current time to calculate turn around time
             gettimeofday(&tv, nullptr);
             curr_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
+
+            //calculate turn around time and add to running tally of turn around time
             av_t += curr_time - p->ts;
 
+            //check for update in min/max turn around time
             if(curr_time - p->ts > max_t){
                 max_t = curr_time - p->ts;
             }
@@ -357,6 +377,8 @@ int main(int argc, char *argv[]){
     int consumer_ids[consumer_arg];             //consumer ids
     pthread_t producer_threads[producer_arg];   //producer threads
     pthread_t consumer_threads[consumer_arg];   //consumer threads
+
+    //get timestamp of start
     gettimeofday(&tv, nullptr);
     uint64_t s_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec;
 
@@ -387,9 +409,11 @@ int main(int argc, char *argv[]){
     pthread_cond_destroy(&full);
     pthread_cond_destroy(&empty);
 
+    //get timestamp of end
     gettimeofday(&tv, nullptr);
-    //calculate the proccesing time for all products
     uint64_t e_time = tv.tv_sec*(uint64_t)1000000 + tv.tv_usec; 
+
+    //calculate the processing time for all products
     e_time = e_time - s_time;
     //print out total processing time
     cout<< "Total time for processing all products : "<< e_time<< "\n";
