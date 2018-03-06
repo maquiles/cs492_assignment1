@@ -330,12 +330,12 @@ void *consumer_FCFS(void* i){
     pthread_exit(0);
 }
 
-double GetTimeInMinutes( timeval tvBegin, timeval tvEnd )
+double GetTimeInSeconds( timeval tvBegin, timeval tvEnd )
 {
 	long sec, usec;
 	sec = tvEnd.tv_sec - tvBegin.tv_sec;
 	usec = tvEnd.tv_usec - tvBegin.tv_usec;
-	return (sec + 1e-6*usec)*60;
+	return (sec + 1e-6*usec);
 }
 
 int main(int argc, char *argv[]){
@@ -456,8 +456,8 @@ int main(int argc, char *argv[]){
     cout<< "Average wait time : "<< (av_w) << "\n";
     cout<< "Min wait time : "<< (min_w) << "\n";
     cout<< "Max wait time : "<< (max_w) << "\n";
-    cout << "Producer throughput : " << (1 / (GetTimeInMinutes(producer_start, producer_end) / product_num)) << " products produced per minute" << endl;
-    cout << "Consumer throughput : " << (1 / (GetTimeInMinutes(consumer_start, consumer_end) / product_num)) << " products consumed per minute" << endl;
+    cout << "Producer throughput : " << (1 / (GetTimeInSeconds(producer_start, producer_end) / product_num)) * 60 << " products produced per minute" << endl;
+    cout << "Consumer throughput : " << (1 / (GetTimeInSeconds(consumer_start, consumer_end) / product_num)) * 60 << " products consumed per minute" << endl;
 
     delete q;
     return 0;
